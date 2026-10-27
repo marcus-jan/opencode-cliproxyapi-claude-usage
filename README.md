@@ -50,7 +50,9 @@ A `/claude-usage` slash command (also in the command palette) force-refreshes an
 }
 ```
 
-Use `#latest` instead of a tag to track the newest release. `latest` is a moving git tag that is re-pointed on every release (`git tag -f latest vX.Y.Z^{} && git push -f origin latest`); OpenCode resolves it as an ordinary git ref. The TUI bundle in `dist/` is committed, so GitHub installs need no build step.
+Pin a version tag. OpenCode installs a git package once per `package` string and caches it under `~/.cache/opencode/npm/`; it never re-checks the ref afterwards. Changing the tag in `opencode.json` is what triggers a fresh install, and OpenCode hot-installs the server plugin on config change (the TUI bundle still only loads at startup).
+
+`#latest` also works (`latest` is a moving git tag re-pointed on every release: `git tag -f latest vX.Y.Z^{} && git push -f origin latest`), but because of the caching above it only tracks the release that was current at first install. To pick up a newer release while on `#latest`, delete `~/.cache/opencode/npm/git-opencode-cliproxyapi-claude-usage-*` and restart OpenCode. The TUI bundle in `dist/` is committed, so GitHub installs need no build step.
 
 For local development point `package` at the checkout directory, run `bun install --frozen-lockfile` and `bun run build:tui`.
 
