@@ -13,6 +13,10 @@ export type Usage = {
   sevenDaySonnet?: Window
   spend?: Spend
   error?: string
+  /** Set when a fresh fetch failed and these are the last good numbers. */
+  stale?: string
+  /** Epoch ms before which the endpoint asked us not to retry. */
+  retryAt?: number
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -87,8 +91,17 @@ export function isClaude(providerID: string | undefined, providers: readonly str
   return providerID !== undefined && providers.includes(providerID)
 }
 
-export function unavailable(message: string): Usage {
-  return { fetchedAt: Date.now(), error: message }
+export function unavailable(message: string, retryAt?: number): Usage {
+  return compact({ fetchedAt: Date.now(), error: message, retryAt })
+}
+
+function retryAfter(response: Response, now: number): number | undefined {
+  const header = response.headers.get("retry-after")
+  if (!header) return undefined
+  const seconds = Number(header)
+  if (Number.isFinite(seconds)) return seconds > 0 ? now + seconds * 1000 : undefined
+  const date = Date.parse(header)
+  return Number.isNaN(date) || date <= now ? undefined : date
 }
 
 /** Claude OAuth access token read from the cliproxyapi auth store. Never return/log it. */
@@ -110,6 +123,7 @@ export async function fetchUsage(
     })
     // Do not surface response bodies or arbitrary exceptions: either may contain secrets.
     if (response.status === 401) return unavailable("Claude token expired or revoked; send a request through the proxy or log in again")
+    if (response.status === 429) return unavailable("Claude usage rate limited; retrying later", retryAfter(response, Date.now()))
     if (!response.ok) return unavailable(`Claude usage unavailable (HTTP ${response.status})`)
     return parseUsage(await response.json(), Date.now(), identity)
   } catch {
@@ -188,6 +202,6 @@ export function details(usage: Usage | undefined, now = Date.now()): string[] {
     ...windowDetail("Weekly Opus", usage.sevenDayOpus, now),
     ...windowDetail("Weekly Sonnet", usage.sevenDaySonnet, now),
     ...(usage.spend?.enabled ? [`Extra usage: ${spendSummary(usage.spend)}${usage.spend.percent === undefined ? "" : ` · ${usage.spend.percent.toFixed(1)}%`}`] : []),
-    `Updated: ${new Date(usage.fetchedAt).toLocaleTimeString()}`,
+    `Updated: ${new Date(usage.fetchedAt).toLocaleTimeString()}${usage.stale ? ` (stale: ${usage.stale})` : ""}`,
   ]
 }

@@ -81,14 +81,18 @@ function normalizeOptions(value) {
 var enabled = (surface2) => surface2.enabled && surface2.lines.length > 0;
 
 // src/usage.ts
+function compact(value) {
+  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined));
+}
 function isClaude(providerID, providers) {
   return providerID !== undefined && providers.includes(providerID);
 }
-function unavailable(message) {
-  return {
+function unavailable(message, retryAt) {
+  return compact({
     fetchedAt: Date.now(),
-    error: message
-  };
+    error: message,
+    retryAt
+  });
 }
 var percent = (value) => value === undefined ? "?" : `${Math.round(value)}%`;
 function amount(value, currency) {
@@ -162,7 +166,7 @@ var windowDetail = (label, window, now) => {
 function details(usage, now = Date.now()) {
   if (!usage || usage.error)
     return [summary(usage)];
-  return [summary(usage), ...usage.account ? [`Account: ${usage.account}`] : [], ...usage.organization ? [`Organization: ${usage.organization}`] : [], ...windowDetail("Session (5h)", usage.fiveHour, now), ...windowDetail("Weekly", usage.sevenDay, now), ...windowDetail("Weekly Opus", usage.sevenDayOpus, now), ...windowDetail("Weekly Sonnet", usage.sevenDaySonnet, now), ...usage.spend?.enabled ? [`Extra usage: ${spendSummary(usage.spend)}${usage.spend.percent === undefined ? "" : ` \xB7 ${usage.spend.percent.toFixed(1)}%`}`] : [], `Updated: ${new Date(usage.fetchedAt).toLocaleTimeString()}`];
+  return [summary(usage), ...usage.account ? [`Account: ${usage.account}`] : [], ...usage.organization ? [`Organization: ${usage.organization}`] : [], ...windowDetail("Session (5h)", usage.fiveHour, now), ...windowDetail("Weekly", usage.sevenDay, now), ...windowDetail("Weekly Opus", usage.sevenDayOpus, now), ...windowDetail("Weekly Sonnet", usage.sevenDaySonnet, now), ...usage.spend?.enabled ? [`Extra usage: ${spendSummary(usage.spend)}${usage.spend.percent === undefined ? "" : ` \xB7 ${usage.spend.percent.toFixed(1)}%`}`] : [], `Updated: ${new Date(usage.fetchedAt).toLocaleTimeString()}${usage.stale ? ` (stale: ${usage.stale})` : ""}`];
 }
 
 // src/presentation.ts

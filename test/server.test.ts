@@ -40,19 +40,18 @@ test("server reads the proxy credential securely, caches by token, and aborts on
     expect(result).toMatchObject({ account: "someone@example.com", organization: "Example", fiveHour: { utilization: 10 } })
     expect(JSON.stringify(result)).not.toMatch(/test-access|refresh/)
     await handler({})
+    await handler({ refresh: true }) // Forced refreshes are rate-limited too: the endpoint throttles aggressively.
     expect(requests).toBe(1)
-    await handler({ refresh: true })
-    expect(requests).toBe(2)
 
     // The proxy rewrites the file when it refreshes the token; the cache follows the new token.
     await writeFile(path, file("test-rotated"))
     await handler({})
-    expect(requests).toBe(3)
-    expect(headers[2]).toBe("Bearer test-rotated")
+    expect(requests).toBe(2)
+    expect(headers[1]).toBe("Bearer test-rotated")
 
     await rm(path)
     expect((await handler({})).error).toBe("No Claude login found in the cliproxyapi auth directory")
-    expect(requests).toBe(3)
+    expect(requests).toBe(2)
     if (typeof cleanup === "function") await cleanup()
     expect(lastSignal?.aborted).toBe(true)
   } finally {

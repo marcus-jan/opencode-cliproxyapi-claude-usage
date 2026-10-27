@@ -37,7 +37,7 @@ A `/claude-usage` slash command (also in the command palette) force-refreshes an
 {
   "plugin": [
     {
-      "package": "github:marcus-jan/opencode-cliproxyapi-claude-usage#v0.2.0",
+      "package": "github:marcus-jan/opencode-cliproxyapi-claude-usage#v0.2.1",
       "options": {
         "refreshSeconds": 120,
         "display": {
@@ -88,7 +88,15 @@ Lines whose value is unknown are skipped. If a surface is enabled but has no `us
 - The access token is read from disk by the server plugin only, kept in memory, and used solely for the `Authorization` header to `https://api.anthropic.com/api/oauth/usage`.
 - It never crosses the TUI RPC boundary, is never logged, and never appears in error messages; HTTP failures surface only as status codes.
 - The cache key is a SHA-256 of the token so a proxy-side token refresh triggers a fresh fetch.
-- Responses are cached for 30 seconds per account on the server side.
+- Responses are cached for 60 seconds per account on the server side; forced refreshes are deduplicated within 20 seconds.
+
+## Rate limiting
+
+Anthropic throttles `api/oauth/usage` aggressively (HTTP 429, often for many minutes). The plugin treats this as routine:
+
+- The last successful reading keeps being displayed; the detail dialog marks it `(stale: …)` with the reason.
+- After a failure the server backs off exponentially (1 min doubling to 15 min, or longer if `Retry-After` says so). Polls and forced refreshes during the backoff are served from cache and make no request.
+- A plain error is shown only when no good reading has been obtained yet.
 
 ## Development
 
