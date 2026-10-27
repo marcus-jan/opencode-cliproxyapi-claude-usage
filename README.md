@@ -50,7 +50,7 @@ A `/claude-usage` slash command (also in the command palette) force-refreshes an
 }
 ```
 
-Use `#latest` instead of a tag to track the newest release. The TUI bundle in `dist/` is committed, so GitHub installs need no build step.
+Use `#latest` instead of a tag to track the newest release. `latest` is a moving git tag that is re-pointed on every release (`git tag -f latest vX.Y.Z^{} && git push -f origin latest`); OpenCode resolves it as an ordinary git ref. The TUI bundle in `dist/` is committed, so GitHub installs need no build step.
 
 For local development point `package` at the checkout directory, run `bun install --frozen-lockfile` and `bun run build:tui`.
 
