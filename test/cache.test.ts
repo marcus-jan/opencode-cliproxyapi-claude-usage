@@ -111,3 +111,48 @@ test("a slow response from an old account cannot overwrite the current account c
   await old
   expect(await cache.get("b", async () => unavailable("unexpected"))).toBe(current)
 })
+
+test("a store shares readings and backoff between cache instances", async () => {
+  let now = 1_000
+  const files = new Map<string, string>()
+  const store = {
+    load: async (key: string) => files.has(key) ? JSON.parse(files.get(key)!) : undefined,
+    save: async (key: string, entry: unknown) => { files.set(key, JSON.stringify(entry)) },
+  }
+  let calls = 0
+  const load = async () => { calls++; return good(now) }
+  const a = createUsageCache(30_000, () => now, 0, store)
+  const b = createUsageCache(30_000, () => now, 0, store)
+  expect(await a.get("k", load)).toEqual(good(1_000))
+  expect(await b.get("k", load)).toEqual(good(1_000)) // second instance reuses the file
+  expect(calls).toBe(1)
+  expect(files.get("k")).not.toContain("pending")
+  now += 30_001
+  await b.get("k", async () => { calls++; return bad(now, "429") })
+  expect(calls).toBe(2)
+  now += 1
+  expect(await a.get("k", load, true)).toEqual({ ...good(1_000), stale: "429" }) // backoff shared
+  expect(calls).toBe(2)
+  now += BACKOFF_BASE
+  expect(await a.get("k", load, true)).toEqual(good(now))
+  expect(calls).toBe(3)
+})
+
+test("file store round-trips entries and tolerates a missing or corrupt file", async () => {
+  const { mkdtemp, rm, writeFile } = await import("node:fs/promises")
+  const { tmpdir } = await import("node:os")
+  const { join } = await import("node:path")
+  const { createFileStore } = await import("../src/store")
+  const dir = await mkdtemp(join(tmpdir(), "claude-store-"))
+  try {
+    const store = createFileStore(join(dir, "nested"))
+    const key = "a".repeat(64)
+    expect(await store.load(key)).toBeUndefined()
+    await store.save(key, { good: good(5), latest: good(5), failures: 0 })
+    expect(await store.load(key)).toEqual({ good: good(5), latest: good(5), retryAt: undefined, failures: 0 })
+    await writeFile(join(dir, "nested", `${"a".repeat(16)}.json`), "{nope")
+    expect(await store.load(key)).toBeUndefined()
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})

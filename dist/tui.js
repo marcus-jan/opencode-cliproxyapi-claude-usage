@@ -38,6 +38,7 @@ import { join } from "path";
 var LINE_IDS = ["title", "usage", "session", "weekly", "opus", "sonnet", "spend", "reset", "account", "organization", "updated"];
 var DEFAULT_PROVIDERS = ["claude-local"];
 var defaultAuthDir = () => join(homedir(), ".config", "cliproxyapi", "auth");
+var defaultCacheDir = () => join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "opencode-claude-usage");
 var record = (value) => value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
 var finite = (value) => typeof value === "number" && Number.isFinite(value);
 var text = (value) => typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
@@ -62,11 +63,13 @@ function normalizeOptions(value) {
   const valid = finite(warning) && finite(critical) && warning >= 0 && warning < critical && critical <= 100;
   const providers = Array.isArray(input.providers) ? [...new Set(input.providers.map(text).filter((id) => id !== undefined))] : [];
   const authDir = text(input.authDir);
+  const cacheDir = text(input.cacheDir);
   return {
     authDir: authDir ? expand(authDir) : defaultAuthDir(),
+    cacheDir: input.cacheDir === false ? false : cacheDir ? expand(cacheDir) : defaultCacheDir(),
     account: text(input.account)?.toLowerCase(),
     providers: providers.length > 0 ? providers : [...DEFAULT_PROVIDERS],
-    refreshSeconds: finite(input.refreshSeconds) ? Math.max(30, input.refreshSeconds) : 60,
+    refreshSeconds: finite(input.refreshSeconds) ? Math.max(60, input.refreshSeconds) : 300,
     colors: {
       mode: colors.mode === "muted" || colors.mode === "inherit" ? colors.mode : "theme",
       warningAt: valid ? warning : 75,

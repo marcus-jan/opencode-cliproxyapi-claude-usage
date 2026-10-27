@@ -7,14 +7,15 @@ test("defaults apply for missing or invalid options", () => {
   const options = normalizeOptions(undefined)
   expect(options).toEqual({
     authDir: join(homedir(), ".config", "cliproxyapi", "auth"),
+    cacheDir: join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "opencode-claude-usage"),
     account: undefined,
     providers: ["claude-local"],
-    refreshSeconds: 60,
+    refreshSeconds: 300,
     colors: { mode: "theme", warningAt: 75, criticalAt: 90 },
     display: { sidebar: { enabled: true, lines: ["title", "usage", "weekly", "reset"] }, home: { enabled: true, lines: ["usage"] } },
   })
   expect(normalizeOptions({ refreshSeconds: 5, colors: { mode: "bogus", warningAt: 95, criticalAt: 50 }, providers: "nope", authDir: 7 }))
-    .toMatchObject({ refreshSeconds: 30, colors: { mode: "theme", warningAt: 75, criticalAt: 90 }, providers: ["claude-local"] })
+    .toMatchObject({ refreshSeconds: 60, colors: { mode: "theme", warningAt: 75, criticalAt: 90 }, providers: ["claude-local"] })
 })
 
 test("auth directory, account and providers are normalized", () => {
@@ -25,6 +26,9 @@ test("auth directory, account and providers are normalized", () => {
   expect(options.account).toBe("someone@example.com")
   expect(options.providers).toEqual(["claude-local", "claude-work"])
   expect(normalizeOptions({ authDir: "/abs/path" }).authDir).toBe("/abs/path")
+  expect(normalizeOptions({ cacheDir: "~/c" }).cacheDir).toBe(join(homedir(), "c"))
+  expect(normalizeOptions({ cacheDir: false }).cacheDir).toBe(false)
+  expect(normalizeOptions({ cacheDir: 3 }).cacheDir).toContain("opencode-claude-usage")
 })
 
 test("surfaces drop unknown and duplicate line ids and can be disabled", () => {

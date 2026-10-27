@@ -27,7 +27,7 @@ test("server reads the proxy credential securely, caches by token, and aborts on
   }
   const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(Object.assign(mockFetch, { preconnect: fetch.preconnect }))
   const context = {
-    options: { authDir: dir },
+    options: { authDir: dir, cacheDir: join(dir, "cache") },
     rpc: { register: async (_definition: unknown, handlers: { get: typeof handler }) => { handler = handlers.get } },
   } as unknown as Plugin.Context
   let cleanup: Awaited<ReturnType<typeof plugin.setup>>
@@ -48,6 +48,11 @@ test("server reads the proxy credential securely, caches by token, and aborts on
     await handler({})
     expect(requests).toBe(2)
     expect(headers[1]).toBe("Bearer test-rotated")
+
+    const { readdir, readFile } = await import("node:fs/promises")
+    const [cached] = await readdir(join(dir, "cache"))
+    expect(cached).toMatch(/^[0-9a-f]{16}\.json$/)
+    expect(await readFile(join(dir, "cache", cached!), "utf8")).not.toMatch(/test-access|test-rotated|refresh/)
 
     await rm(path)
     expect((await handler({})).error).toBe("No Claude login found in the cliproxyapi auth directory")
@@ -72,7 +77,7 @@ test("account option selects among multiple proxy logins", async () => {
   }
   const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(Object.assign(mockFetch, { preconnect: fetch.preconnect }))
   const context = {
-    options: { authDir: dir, account: "B@example.com" },
+    options: { authDir: dir, account: "B@example.com", cacheDir: false },
     rpc: { register: async (_definition: unknown, handlers: { get: typeof handler }) => { handler = handlers.get } },
   } as unknown as Plugin.Context
   try {

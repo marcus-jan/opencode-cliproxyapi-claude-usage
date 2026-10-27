@@ -231,7 +231,7 @@ test("hidden surfaces gate automatic refresh, retain manual details, and clean u
   const intervals: Array<() => void> = []
   const timeouts: Array<() => void> = []
   const interval = spyOn(globalThis, "setInterval").mockImplementation(((fn: () => void, delay: number) => {
-    expect(delay).toBe(60_000); intervals.push(fn); return 123
+    expect(delay).toBe(300_000); intervals.push(fn); return 123
   }) as typeof setInterval)
   const timeout = spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void) => { timeouts.push(fn); return 456 }) as typeof setTimeout)
   const cleared = spyOn(globalThis, "clearInterval")

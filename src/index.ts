@@ -4,13 +4,14 @@ import { loadCredential } from "./auth"
 import { createUsageCache } from "./cache"
 import { normalizeOptions } from "./options"
 import { ClaudeUsage } from "./rpc"
+import { createFileStore } from "./store"
 import { fetchUsage, unavailable } from "./usage"
 
 export default Plugin.define({
   id: "claude-usage-sidebar",
   async setup(context) {
     const options = normalizeOptions(context.options)
-    const cache = createUsageCache()
+    const cache = createUsageCache(undefined, undefined, undefined, options.cacheDir ? createFileStore(options.cacheDir) : undefined)
     const controller = new AbortController()
     await context.rpc.register(ClaudeUsage, {
       get: async (input) => {

@@ -37,7 +37,7 @@ A `/claude-usage` slash command (also in the command palette) force-refreshes an
 {
   "plugin": [
     {
-      "package": "github:marcus-jan/opencode-cliproxyapi-claude-usage#v0.2.1",
+      "package": "github:marcus-jan/opencode-cliproxyapi-claude-usage#v0.3.0",
       "options": {
         "refreshSeconds": 120,
         "display": {
@@ -59,9 +59,10 @@ For local development point `package` at the checkout directory, run `bun instal
 | Option | Default | Description |
 | --- | --- | --- |
 | `authDir` | `~/.config/cliproxyapi/auth` | Directory holding the proxy's `claude-*.json` login files. `~` is expanded. |
+| `cacheDir` | `$XDG_CACHE_HOME/opencode-claude-usage` (`~/.cache/...`) | Where readings are shared between OpenCode server instances and restarts. Set to `false` for memory-only caching. |
 | `account` | first live login | Email of the login to use when several Claude accounts are logged in. |
 | `providers` | `["claude-local"]` | OpenCode provider ids that route to the proxy. Usage shows only while one of them is selected. |
-| `refreshSeconds` | `60` (min 30) | Automatic poll interval. A forced refresh also runs 3s after each completed turn in the current session. |
+| `refreshSeconds` | `300` (min 60) | Automatic poll interval. A forced refresh also runs 3s after each completed turn in the current session, but never more than once a minute. |
 | `colors.mode` | `"theme"` | `theme` colors the usage line by severity; `muted` uses the muted text color; `inherit` sets no colors. |
 | `colors.warningAt` / `colors.criticalAt` | `75` / `90` | Utilization thresholds (percent). The higher of the session and weekly windows drives severity; spend-only accounts use spend percent. |
 | `display.sidebar` | `{ enabled: true, lines: ["title", "usage", "weekly", "reset"] }` | Sidebar surface. |
@@ -88,7 +89,8 @@ Lines whose value is unknown are skipped. If a surface is enabled but has no `us
 - The access token is read from disk by the server plugin only, kept in memory, and used solely for the `Authorization` header to `https://api.anthropic.com/api/oauth/usage`.
 - It never crosses the TUI RPC boundary, is never logged, and never appears in error messages; HTTP failures surface only as status codes.
 - The cache key is a SHA-256 of the token so a proxy-side token refresh triggers a fresh fetch.
-- Responses are cached for 60 seconds per account on the server side; forced refreshes are deduplicated within 20 seconds.
+- Responses are cached for 60 seconds per account; forced refreshes are deduplicated within 60 seconds.
+- The cache file under `cacheDir` (mode 0600) contains only what the sidebar displays plus backoff state; its name is a prefix of the token hash. It never contains the token.
 
 ## Rate limiting
 
@@ -96,6 +98,7 @@ Anthropic throttles `api/oauth/usage` aggressively (HTTP 429, often for many min
 
 - The last successful reading keeps being displayed; the detail dialog marks it `(stale: …)` with the reason.
 - After a failure the server backs off exponentially (1 min doubling to 15 min, or longer if `Retry-After` says so). Polls and forced refreshes during the backoff are served from cache and make no request.
+- OpenCode runs one server plugin instance per open workspace. They share one reading and one backoff timer through `cacheDir`, so opening five workspaces (or restarting) does not multiply requests.
 - A plain error is shown only when no good reading has been obtained yet.
 
 ## Development
