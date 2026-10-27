@@ -29,11 +29,16 @@ function string(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined
 }
 
+// The RPC output validator rejects `undefined` values, so optional keys must be absent rather than undefined.
+function compact<T extends object>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T
+}
+
 function window(value: unknown): Window | undefined {
   const input = record(value)
   const utilization = number(input.utilization)
   if (utilization === undefined) return undefined
-  return { utilization: Math.min(100, utilization), resetsAt: string(input.resets_at) }
+  return compact({ utilization: Math.min(100, utilization), resetsAt: string(input.resets_at) })
 }
 
 function money(value: unknown, fallbackExponent: number): number | undefined {
@@ -60,13 +65,13 @@ function spend(body: Record<string, unknown>): Spend | undefined {
   const percent = number(extra.utilization) ?? (
     used !== undefined && limit !== undefined && limit > 0 ? used / limit * 100 : number(reported.percent)
   )
-  return { used: used ?? 0, limit, currency, percent: percent === undefined ? undefined : Math.min(100, percent), enabled }
+  return compact({ used: used ?? 0, limit, currency, percent: percent === undefined ? undefined : Math.min(100, percent), enabled })
 }
 
 export function parseUsage(value: unknown, now = Date.now(), identity: { account?: string; organization?: string } = {}): Usage {
   const body = record(value)
   if (Object.keys(body).length === 0) throw new Error("Invalid usage response")
-  return {
+  return compact({
     fetchedAt: now,
     account: identity.account,
     organization: identity.organization,
@@ -75,7 +80,7 @@ export function parseUsage(value: unknown, now = Date.now(), identity: { account
     sevenDayOpus: window(body.seven_day_opus),
     sevenDaySonnet: window(body.seven_day_sonnet),
     spend: spend(body),
-  }
+  })
 }
 
 export function isClaude(providerID: string | undefined, providers: readonly string[]): boolean {

@@ -24,9 +24,8 @@ test("parses subscription windows and extra usage, ignoring unknown and null fie
     fiveHour: { utilization: 42.4, resetsAt: "2026-10-27T12:30:00Z" },
     sevenDay: { utilization: 61, resetsAt: "2026-10-30T10:00:00Z" },
     sevenDayOpus: { utilization: 12, resetsAt: "2026-10-30T10:00:00Z" },
-    sevenDaySonnet: undefined,
-    spend: undefined,
   })
+  expect(usage).toStrictEqual(JSON.parse(JSON.stringify(usage)))
   expect(summary(usage)).toBe("Claude: 42% of 5h limit · 61% weekly")
   expect(percentUsed(usage)).toBe(61)
   expect(details(usage, now)).toEqual([
@@ -42,8 +41,8 @@ test("parses subscription windows and extra usage, ignoring unknown and null fie
 
 test("org-managed accounts without windows fall back to extra usage spend", () => {
   const usage = parseUsage(team, now)
-  expect(usage.fiveHour).toBeUndefined()
-  expect(usage.spend).toEqual({ used: 0.99, limit: 1500, currency: "USD", percent: 0.066, enabled: true })
+  expect(usage).toStrictEqual({ fetchedAt: now, spend: { used: 0.99, limit: 1500, currency: "USD", percent: 0.066, enabled: true } })
+  expect(usage).toStrictEqual(JSON.parse(JSON.stringify(usage)))
   expect(summary(usage)).toBe("Claude: $0.99 / $1,500.00 extra usage")
   expect(percentUsed(usage)).toBe(0.066)
   expect(details(usage, now)).toContain("Extra usage: $0.99 / $1,500.00 extra usage · 0.1%")
