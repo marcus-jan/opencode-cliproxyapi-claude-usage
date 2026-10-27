@@ -1,4 +1,4 @@
-# opencode-claude-usage
+# opencode-cliproxyapi-claude-usage
 
 OpenCode plugin that shows Claude subscription usage in the sidebar and on the home screen when the active model is served through a local [cliproxyapi](https://github.com/router-for-me/CLIProxyAPI) Claude login.
 
@@ -37,7 +37,7 @@ A `/claude-usage` slash command (also in the command palette) force-refreshes an
 {
   "plugin": [
     {
-      "package": "github:marcus-jan/opencode-claude-usage#v0.1.0",
+      "package": "github:marcus-jan/opencode-cliproxyapi-claude-usage#v0.2.0",
       "options": {
         "refreshSeconds": 120,
         "display": {

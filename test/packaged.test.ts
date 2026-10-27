@@ -14,7 +14,7 @@ test("GitHub installs do not trigger npm Git-dependency preparation", async () =
 test("installed TUI fetches after model hydration without a turn or poll", async () => {
   const directory = await mkdtemp(join(tmpdir(), "claude-packaged-startup-"))
   try {
-    const installed = join(directory, "node_modules/opencode-claude-usage-sidebar")
+    const installed = join(directory, "node_modules/opencode-cliproxyapi-claude-usage-sidebar")
     const manifest = JSON.parse(await readFile("package.json", "utf8"))
     const entrypoint = join(installed, manifest.exports["./tui"])
     await mkdir(dirname(entrypoint), { recursive: true })

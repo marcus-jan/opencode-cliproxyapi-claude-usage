@@ -1,16 +1,16 @@
 {
-  "name": "opencode-claude-usage-sidebar",
-  "version": "0.1.0",
+  "name": "opencode-cliproxyapi-claude-usage-sidebar",
+  "version": "0.2.0",
   "description": "OpenCode sidebar and home-screen usage for a Claude subscription served through cliproxyapi",
   "type": "module",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/marcus-jan/opencode-claude-usage.git"
+    "url": "git+https://github.com/marcus-jan/opencode-cliproxyapi-claude-usage.git"
   },
-  "homepage": "https://github.com/marcus-jan/opencode-claude-usage#readme",
+  "homepage": "https://github.com/marcus-jan/opencode-cliproxyapi-claude-usage#readme",
   "bugs": {
-    "url": "https://github.com/marcus-jan/opencode-claude-usage/issues"
+    "url": "https://github.com/marcus-jan/opencode-cliproxyapi-claude-usage/issues"
   },
   "keywords": [
     "opencode",

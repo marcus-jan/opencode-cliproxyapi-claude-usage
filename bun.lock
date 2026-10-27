@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "opencode-claude-usage-sidebar",
+      "name": "opencode-cliproxyapi-claude-usage-sidebar",
       "dependencies": {
         "@opencode/plugin": "2.1.4",
       },
