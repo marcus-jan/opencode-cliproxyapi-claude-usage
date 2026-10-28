@@ -13,7 +13,7 @@ const resetsAt = new Date(Date.now() + 150 * 60_000 + 500).toISOString()
 const quota = parseUsage({ five_hour: { utilization: 90, resets_at: resetsAt }, seven_day: { utilization: 35 } },
   Date.now(), { account: "example", organization: "Example Org" })
 
-async function harness(options: unknown = {}, value = quota, width = 100, height = 25) {
+async function harness(options: unknown = {}, value = quota, width = 100, height = 25, server: unknown = {}) {
   const claims: Claim[] = []
   const [light, setLight] = createSignal(false)
   const [provider, setProvider] = createSignal("claude-local")
@@ -28,7 +28,7 @@ async function harness(options: unknown = {}, value = quota, width = 100, height
   let disposeRoot!: () => void
   const context = {
     options,
-    client: { rpc: () => ({ get: async () => { calls++; return value } }) },
+    client: { rpc: () => ({ get: async () => { calls++; return value }, options: async () => server }) },
     data: { on: (_: string, handler: typeof event) => { event = handler; return () => { stops++ } } },
     keymap: { layer: (factory: () => { commands: typeof command[] }) => { command = factory().commands[0]! } },
     theme: { text: {
@@ -176,6 +176,24 @@ test("ordered home rows, optional sidebar lines and narrow layout preserve host 
     const rows = h.view.captureCharFrame().split("\n").map((row) => row.trim()).filter(Boolean)
     expect(rows).toEqual(["branch: main", "Org: Example Org", "Account: example", "Resets: in 2h 30m", "Session: 90% used", "Account: example", "after"])
   } finally { await h.dispose() }
+})
+
+test("opencode.json options reach the auto-loaded TUI through the server", async () => {
+  const server = { providers: ["my-proxy"], display: { sidebar: { lines: ["title", "account"] }, home: { enabled: false } } }
+  const h = await harness({}, quota, 100, 25, server)
+  try {
+    await h.view.waitForFrame((frame) => !frame.includes("Claude usage"))
+    h.setProvider("my-proxy")
+    await h.view.waitForFrame((frame) => frame.includes("Account: example"))
+    const rows = h.view.captureCharFrame().split("\n").map((row) => row.trim()).filter(Boolean)
+    expect(rows).toEqual(["branch: main", "MCP healthy", "Claude usage", "Account: example", "after"])
+  } finally { await h.dispose() }
+  const local = await harness({ display: { sidebar: { lines: ["organization"] } } }, quota, 100, 25, server)
+  try {
+    await local.view.renderOnce()
+    expect(local.view.captureCharFrame()).toContain("Org: Example Org")
+    expect(local.view.captureCharFrame()).not.toContain("Account: example")
+  } finally { await local.dispose() }
 })
 
 test("missing optional fields leave no gaps; errors remain visible without a selected usage line", async () => {

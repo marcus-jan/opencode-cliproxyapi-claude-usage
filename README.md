@@ -37,7 +37,7 @@ A `/claude-usage` slash command (also in the command palette) force-refreshes an
 {
   "plugin": [
     {
-      "package": "github:marcus-jan/opencode-cliproxyapi-claude-usage#v0.3.0",
+      "package": "github:marcus-jan/opencode-cliproxyapi-claude-usage#v0.3.1",
       "options": {
         "refreshSeconds": 120,
         "display": {

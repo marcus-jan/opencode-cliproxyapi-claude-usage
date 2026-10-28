@@ -12,5 +12,9 @@ export const ClaudeUsage = Rpc.define({
       },
       output: { type: "object" },
     },
+    options: {
+      input: { type: "object", additionalProperties: false },
+      output: { type: "object" },
+    },
   },
 })

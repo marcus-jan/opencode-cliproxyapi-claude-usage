@@ -13,7 +13,11 @@ export default Plugin.define({
     const options = normalizeOptions(context.options)
     const cache = createUsageCache(undefined, undefined, undefined, options.cacheDir ? createFileStore(options.cacheDir) : undefined)
     const controller = new AbortController()
+    // OpenCode does not pass opencode.json options to auto-loaded TUI entrypoints,
+    // so the TUI reads the display-related options over RPC. Local paths stay here.
+    const { providers, refreshSeconds, colors, display } = options
     await context.rpc.register(ClaudeUsage, {
+      options: async () => ({ providers, refreshSeconds, colors, display }),
       get: async (input) => {
         try {
           const credential = await loadCredential(options.authDir, options.account)

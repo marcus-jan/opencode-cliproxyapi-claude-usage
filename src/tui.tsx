@@ -11,17 +11,29 @@ export default Plugin.define({
   setup(context) {
     const rpc = context.client.rpc(ClaudeUsage)
     const [usage, setUsage] = createSignal<Usage>()
-    const options = normalizeOptions(context.options)
-    const active = () => isClaude(context.ui.model.current()?.providerID, options.providers)
+    // Options configured in cli.json arrive here. Plugins configured in opencode.json
+    // load their TUI with empty options, so ask the server half for its options.
+    const local = Object.keys(context.options ?? {}).length > 0
+    const [options, setOptions] = createSignal(normalizeOptions(context.options), {
+      equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+    })
+    const active = () => isClaude(context.ui.model.current()?.providerID, options().providers)
     // Packaged slots need not share OpenTUI's ambient RendererContext. Use the
     // renderer supplied by the plugin host instead of renderer-context hooks.
     const [dimensions, setDimensions] = createSignal({ width: context.renderer.width, height: context.renderer.height })
     const resize = (width: number, height: number) => setDimensions({ width, height })
     context.renderer.on("resize", resize)
-    const automatic = () => active() && (enabled(options.display.sidebar) || enabled(options.display.home))
+    const automatic = () => active() && (enabled(options().display.sidebar) || enabled(options().display.home))
     let disposed = false
     let pending: Promise<void> | undefined
     let turnTimer: ReturnType<typeof setTimeout> | undefined
+
+    function loadOptions(): Promise<void> {
+      if (local) return Promise.resolve()
+      return Promise.resolve().then(() => rpc.options({})).then((result) => {
+        if (!disposed) setOptions(normalizeOptions(result))
+      }).catch(() => {})
+    }
 
     function refresh(force = false): Promise<void> {
       if (disposed || !active()) return Promise.resolve()
@@ -39,12 +51,24 @@ export default Plugin.define({
     const stopModel = createRoot((dispose) => {
       createEffect(() => {
         const providerID = context.ui.model.current()?.providerID
-        if (isClaude(providerID, options.providers) && automatic()) void refresh()
+        if (isClaude(providerID, options().providers) && automatic()) void refresh()
         else setUsage(undefined)
       })
       return dispose
     })
-    const timer = setInterval(() => { if (automatic()) void refresh() }, options.refreshSeconds * 1000)
+    let timer: ReturnType<typeof setInterval> | undefined
+    const stopTimer = createRoot((dispose) => {
+      createEffect(() => {
+        const seconds = options().refreshSeconds
+        clearInterval(timer)
+        timer = setInterval(() => {
+          if (local) { if (automatic()) void refresh(); return }
+          void loadOptions().then(() => { if (automatic()) void refresh() })
+        }, seconds * 1000)
+      })
+      return dispose
+    })
+    void loadOptions()
     const stopTurn = context.data.on("session.execution.succeeded", (event) => {
       const route = context.ui.router.current()
       if (!automatic() || route.type !== "session" || event.data.sessionID !== route.sessionID) return
@@ -53,9 +77,9 @@ export default Plugin.define({
     })
 
     const color = (role: Role) => {
-      if (options.colors.mode === "inherit") return undefined
-      if (options.colors.mode === "muted" || role === "label") return context.theme.text.muted
-      const level = severity(usage(), options.colors.warningAt, options.colors.criticalAt)
+      if (options().colors.mode === "inherit") return undefined
+      if (options().colors.mode === "muted" || role === "label") return context.theme.text.muted
+      const level = severity(usage(), options().colors.warningAt, options().colors.criticalAt)
       return role === "quota" && level !== "normal" ? context.theme.text.feedback[level].base : context.theme.text.base
     }
     const Lines = (props: { lines: Line[] }) => <For each={props.lines}>{(line) => (
@@ -63,8 +87,8 @@ export default Plugin.define({
         <span style={{ fg: color(segment.role) }}><Show when={segment.role === "heading"} fallback={segment.text}><b>{segment.text}</b></Show></span>
       )}</For></text>
     )}</For>
-    const sidebarLines = () => displayLines(usage(), options.display.sidebar)
-    const homeLines = () => displayLines(usage(), options.display.home, true)
+    const sidebarLines = () => displayLines(usage(), options().display.sidebar)
+    const homeLines = () => displayLines(usage(), options().display.home, true)
 
     // Additive: no replace claims, host lookups, or mutation of the built-in layout.
     context.ui.slot({
@@ -116,6 +140,7 @@ export default Plugin.define({
     return () => {
       disposed = true
       stopModel()
+      stopTimer()
       clearInterval(timer)
       clearTimeout(turnTimer)
       context.renderer.off("resize", resize)

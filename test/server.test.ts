@@ -16,6 +16,7 @@ test("server reads the proxy credential securely, caches by token, and aborts on
   const path = join(dir, "claude-test.json")
   await writeFile(path, file("test-access"))
   let handler!: (input: { refresh?: boolean }) => Promise<Usage>
+  let options!: () => Promise<Record<string, unknown>>
   let lastSignal: AbortSignal | undefined
   let requests = 0
   const headers: string[] = []
@@ -27,13 +28,19 @@ test("server reads the proxy credential securely, caches by token, and aborts on
   }
   const fetchSpy = spyOn(globalThis, "fetch").mockImplementation(Object.assign(mockFetch, { preconnect: fetch.preconnect }))
   const context = {
-    options: { authDir: dir, cacheDir: join(dir, "cache") },
-    rpc: { register: async (_definition: unknown, handlers: { get: typeof handler }) => { handler = handlers.get } },
+    options: { authDir: dir, cacheDir: join(dir, "cache"), refreshSeconds: 5, display: { sidebar: { lines: ["spend", "bogus"] } } },
+    rpc: { register: async (_definition: unknown, handlers: { get: typeof handler; options: typeof options }) => {
+      handler = handlers.get
+      options = handlers.options
+    } },
   } as unknown as Plugin.Context
   let cleanup: Awaited<ReturnType<typeof plugin.setup>>
   try {
     cleanup = await plugin.setup(context)
     expect(typeof handler).toBe("function")
+    const shared = await options()
+    expect(shared).toMatchObject({ providers: ["claude-local"], refreshSeconds: 60, display: { sidebar: { lines: ["spend"] }, home: { lines: ["usage"] } } })
+    expect(Object.keys(shared).sort()).toEqual(["colors", "display", "providers", "refreshSeconds"])
     expect(requests).toBe(0) // Loading the plugin alone makes no Anthropic request.
     const result = await handler({})
     expect(headers[0]).toBe("Bearer test-access")

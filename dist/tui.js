@@ -28,6 +28,15 @@ var ClaudeUsage = Rpc.define({
       output: {
         type: "object"
       }
+    },
+    options: {
+      input: {
+        type: "object",
+        additionalProperties: false
+      },
+      output: {
+        type: "object"
+      }
     }
   }
 });
@@ -238,8 +247,11 @@ var tui_default = Plugin.define({
   setup(context) {
     const rpc = context.client.rpc(ClaudeUsage);
     const [usage, setUsage] = createSignal();
-    const options = normalizeOptions(context.options);
-    const active = () => isClaude(context.ui.model.current()?.providerID, options.providers);
+    const local = Object.keys(context.options ?? {}).length > 0;
+    const [options, setOptions] = createSignal(normalizeOptions(context.options), {
+      equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
+    });
+    const active = () => isClaude(context.ui.model.current()?.providerID, options().providers);
     const [dimensions, setDimensions] = createSignal({
       width: context.renderer.width,
       height: context.renderer.height
@@ -249,10 +261,18 @@ var tui_default = Plugin.define({
       height
     });
     context.renderer.on("resize", resize);
-    const automatic = () => active() && (enabled(options.display.sidebar) || enabled(options.display.home));
+    const automatic = () => active() && (enabled(options().display.sidebar) || enabled(options().display.home));
     let disposed = false;
     let pending;
     let turnTimer;
+    function loadOptions() {
+      if (local)
+        return Promise.resolve();
+      return Promise.resolve().then(() => rpc.options({})).then((result) => {
+        if (!disposed)
+          setOptions(normalizeOptions(result));
+      }).catch(() => {});
+    }
     function refresh(force = false) {
       if (disposed || !active())
         return Promise.resolve();
@@ -274,17 +294,33 @@ var tui_default = Plugin.define({
     const stopModel = createRoot((dispose) => {
       createEffect(() => {
         const providerID = context.ui.model.current()?.providerID;
-        if (isClaude(providerID, options.providers) && automatic())
+        if (isClaude(providerID, options().providers) && automatic())
           refresh();
         else
           setUsage(undefined);
       });
       return dispose;
     });
-    const timer = setInterval(() => {
-      if (automatic())
-        refresh();
-    }, options.refreshSeconds * 1000);
+    let timer;
+    const stopTimer = createRoot((dispose) => {
+      createEffect(() => {
+        const seconds = options().refreshSeconds;
+        clearInterval(timer);
+        timer = setInterval(() => {
+          if (local) {
+            if (automatic())
+              refresh();
+            return;
+          }
+          loadOptions().then(() => {
+            if (automatic())
+              refresh();
+          });
+        }, seconds * 1000);
+      });
+      return dispose;
+    });
+    loadOptions();
     const stopTurn = context.data.on("session.execution.succeeded", (event) => {
       const route = context.ui.router.current();
       if (!automatic() || route.type !== "session" || event.data.sessionID !== route.sessionID)
@@ -296,11 +332,11 @@ var tui_default = Plugin.define({
       }, 3000);
     });
     const color = (role) => {
-      if (options.colors.mode === "inherit")
+      if (options().colors.mode === "inherit")
         return;
-      if (options.colors.mode === "muted" || role === "label")
+      if (options().colors.mode === "muted" || role === "label")
         return context.theme.text.muted;
-      const level = severity(usage(), options.colors.warningAt, options.colors.criticalAt);
+      const level = severity(usage(), options().colors.warningAt, options().colors.criticalAt);
       return role === "quota" && level !== "normal" ? context.theme.text.feedback[level].base : context.theme.text.base;
     };
     const Lines = (props) => _$createComponent(For, {
@@ -337,8 +373,8 @@ var tui_default = Plugin.define({
         return _el$;
       })()
     });
-    const sidebarLines = () => displayLines(usage(), options.display.sidebar);
-    const homeLines = () => displayLines(usage(), options.display.home, true);
+    const sidebarLines = () => displayLines(usage(), options().display.sidebar);
+    const homeLines = () => displayLines(usage(), options().display.home, true);
     context.ui.slot({
       append: "sidebar.content",
       render: () => _$createComponent(Show, {
@@ -410,6 +446,7 @@ var tui_default = Plugin.define({
     return () => {
       disposed = true;
       stopModel();
+      stopTimer();
       clearInterval(timer);
       clearTimeout(turnTimer);
       context.renderer.off("resize", resize);
